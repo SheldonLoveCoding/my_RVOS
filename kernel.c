@@ -13,7 +13,8 @@ void start_kernel(void)
 	uart_init();
 	uart_puts("Hello, RVOS!\n");
 
-	page_init();
+	malloc_init();
+	
 	page_test();
 
 	while (1) {}; // stop here!
