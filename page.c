@@ -221,82 +221,82 @@ void page_free(void *p)
  * 字节为单位的malloc的初始化
  */
 void malloc_init() {
-  // 首先要进行page的初始化，得到_alloc_start 和 _alloc_end
-  page_init();
-  // 这里不向操作系统申请堆空间，只是为了获取堆的起始地址和最后有效地址
-  last_valid_address = (void *)_alloc_end; // 堆的最后有效地址last_valid_address
-  managed_memory_start = (void *)_alloc_start; //堆的起始地址managed_memory_start
-  _mlloc_initialized = 1;
+	// 首先要进行page的初始化，得到_alloc_start 和 _alloc_end
+	page_init();
+	// 这里不向操作系统申请堆空间，只是为了获取堆的起始地址和最后有效地址
+	last_valid_address = (void *)_alloc_end; // 堆的最后有效地址last_valid_address
+	managed_memory_start = (void *)_alloc_start; //堆的起始地址managed_memory_start
+	_mlloc_initialized = 1;
 }
 
 void *my_malloc(size_t numbytes) {
-  void *current_location;  // 当前访问的内存位置
-  struct mem_control_block *current_location_mcb;  // 只是作了一个强制类型转换
-  
-  void *memory_location;  // 这是要返回的内存位置。初始时设为
-                          // 0，表示没有找到合适的位置
-  if (!_mlloc_initialized) {
-    malloc_init();
-  }
-  // 要查找的内存必须包含内存控制块，所以需要调整 numbytes 的大小
-  numbytes = numbytes + sizeof(struct mem_control_block);
-  // 初始时设为 0，表示没有找到合适的位置
-  memory_location = 0;
-  /* Begin searching at the start of managed memory */
-  // 从被管理内存的起始位置开始搜索
-  // managed_memory_start 是在 malloc_init 中通过 sbrk() 函数设置的
-  current_location = managed_memory_start;
-  while (current_location < last_valid_address) {
-    // current_location 是一个 void 指针，用来计算地址；
-    // current_location_mcb 是一个具体的结构体类型
-    // 这两个实际上是一个含义
-    current_location_mcb = (struct mem_control_block *)current_location;
+	void *current_location;  // 当前访问的内存位置
+	struct mem_control_block *current_location_mcb;  // 只是作了一个强制类型转换
 	
-    if (!current_location_mcb->is_used) {
-		if((current_location_mcb->size == 0) || 
-				(current_location_mcb->size != 0 && current_location_mcb->size >= numbytes))
-				{
-					// 找到一个可用、大小适合的内存块
-					current_location_mcb->is_used = 1;  // 设为不可用
-					current_location_mcb->size = numbytes;
-					memory_location = current_location;      // 设置内存地址
-					break;
-				}
-    }
-    // 否则，当前内存块不可用或过小，移动到下一个内存块
-    current_location = current_location + current_location_mcb->size;
-  }
-  // 循环结束，没有找到合适的位置，需要向操作系统申请更多内存，但是在本系统里不会涉及拓展的问题
-  if (!memory_location) {
-	printf("RVOS need create a new page!!\n");
-	
-    // 扩展堆page
-    void* page_new = page_alloc(1);
-	_allocd_page_end = (void *)page_new + PAGE_SIZE;
-	
-    // 新的内存的起始位置就是 last_valid_address 的旧值
-    memory_location = (void *)page_new;
-    // 将 last_valid_address 后移 numbytes，移动到整个内存的最右边界
-    //last_valid_address = last_valid_address + numbytes;
-	last_valid_address = (void *)_allocd_page_end;
-    // 初始化内存控制块 mem_control_block
-    current_location_mcb = memory_location;
-    current_location_mcb->is_used = 1;
-    current_location_mcb->size = numbytes;
-  }
-  // 最终，memory_location 保存了大小为 numbyte的内存空间，
-  // 并且在空间的开始处包含了一个内存控制块，记录了元信息
-  // 内存控制块对于用户而言应该是透明的，因此返回指针前，跳过内存分配块
-  memory_location = memory_location + sizeof(struct mem_control_block);
-  // 返回内存块的指针
-  return memory_location;
+	void *memory_location;  // 这是要返回的内存位置。初始时设为
+							// 0，表示没有找到合适的位置
+	if (!_mlloc_initialized) {
+		malloc_init();
+	}
+	// 要查找的内存必须包含内存控制块，所以需要调整 numbytes 的大小
+	numbytes = numbytes + sizeof(struct mem_control_block);
+	// 初始时设为 0，表示没有找到合适的位置
+	memory_location = 0;
+	/* Begin searching at the start of managed memory */
+	// 从被管理内存的起始位置开始搜索
+	// managed_memory_start 是在 malloc_init 中通过 sbrk() 函数设置的
+	current_location = managed_memory_start;
+	while (current_location < last_valid_address) {
+		// current_location 是一个 void 指针，用来计算地址；
+		// current_location_mcb 是一个具体的结构体类型
+		// 这两个实际上是一个含义
+		current_location_mcb = (struct mem_control_block *)current_location;
+		
+		if (!current_location_mcb->is_used) {
+			if((current_location_mcb->size == 0) || 
+					(current_location_mcb->size != 0 && current_location_mcb->size >= numbytes))
+					{
+						// 找到一个可用、大小适合的内存块
+						current_location_mcb->is_used = 1;  // 设为不可用
+						current_location_mcb->size = numbytes;
+						memory_location = current_location;      // 设置内存地址
+						break;
+					}
+		}
+		// 否则，当前内存块不可用或过小，移动到下一个内存块
+		current_location = current_location + current_location_mcb->size;
+	}
+	// 循环结束，没有找到合适的位置，需要向操作系统申请更多内存，但是在本系统里不会涉及拓展的问题
+	if (!memory_location) {
+		printf("RVOS need create a new page!!\n");
+		
+		// 扩展堆page
+		void* page_new = page_alloc(1);
+		_allocd_page_end = (void *)page_new + PAGE_SIZE;
+		
+		// 新的内存的起始位置就是 last_valid_address 的旧值
+		memory_location = (void *)page_new;
+		// 将 last_valid_address 后移 numbytes，移动到整个内存的最右边界
+		//last_valid_address = last_valid_address + numbytes;
+		last_valid_address = (void *)_allocd_page_end;
+		// 初始化内存控制块 mem_control_block
+		current_location_mcb = memory_location;
+		current_location_mcb->is_used = 1;
+		current_location_mcb->size = numbytes;
+	}
+	// 最终，memory_location 保存了大小为 numbyte的内存空间，
+	// 并且在空间的开始处包含了一个内存控制块，记录了元信息
+	// 内存控制块对于用户而言应该是透明的，因此返回指针前，跳过内存分配块
+	memory_location = memory_location + sizeof(struct mem_control_block);
+	// 返回内存块的指针
+	return memory_location;
 }
 
 void my_free(void *ptr) {  // ptr 是要回收的空间
-  struct mem_control_block *free;
-  free = ptr - sizeof(struct mem_control_block); // 找到该内存块的控制信息的地址
-  free->is_used = 0;  // 该空间置为可用
-  return;
+	struct mem_control_block *free;
+	free = ptr - sizeof(struct mem_control_block); // 找到该内存块的控制信息的地址
+	free->is_used = 0;  // 该空间置为可用
+	return;
 }
 
 void page_test()
