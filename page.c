@@ -20,57 +20,41 @@ extern uint32_t HEAP_SIZE;
  * _num_pages holds the actual max number of pages we can allocate.
  */
 static uint32_t _alloc_start = 0;
-static uint32_t _allocd_page_end = 0;
 static uint32_t _alloc_end = 0;
 static uint32_t _num_pages = 0;
-static uint32_t _mlloc_start = 0;
-static uint32_t _mlloc_end = 0;
+
+static uint32_t _allocd_page_end = 0;
 static uint32_t _mlloc_initialized = 0;     // 初始化malloc标志
 void *managed_memory_start;  // 指向堆底（内存块起始位置）
 void *last_valid_address;    // 指向堆顶
 
-#define PAGE_SIZE 4096
-#define PAGE_ORDER 12 // page的大小 量级 2^12 = 4K
-
-// 相当于掩码
-#define PAGE_TAKEN (uint8_t)(1 << 0)
-#define PAGE_LAST  (uint8_t)(1 << 1)
-#define PAGE_FULL  (uint8_t)(1 << 2) //判断该page是否还存在空余内存可以提供malloc
-
-/*
- * Page Descriptor 
- * flags:
- * - bit 0: flag if this page is taken(allocated) 1-taken 0-not taken
- * - bit 1: flag if this page is the last page of the memory block allocated 1-last 0-not last
- */
-struct Page {
-	uint8_t flags;
-};
-/*
- * 内存控制块，用来描述malloc的开辟的nbytes内存块的信息
- */
+/* 内存控制块，用来描述malloc的开辟的nbytes内存块的信息*/
 struct mem_control_block {
   uint8_t is_used; // 是否可用（如果还没被分配出去，就是 0）
   uint8_t size;         // 实际空间的大小
 };
 
-// 将该page block  clear是清楚标志位
+#define PAGE_SIZE 4096
+#define PAGE_ORDER 12
+
+#define PAGE_TAKEN (uint8_t)(1 << 0)
+#define PAGE_LAST  (uint8_t)(1 << 1)
+
+/*
+ * Page Descriptor 
+ * flags:
+ * - bit 0: flag if this page is taken(allocated)
+ * - bit 1: flag if this page is the last page of the memory block allocated
+ */
+struct Page {
+	uint8_t flags;
+};
+
 static inline void _clear(struct Page *page)
 {
 	page->flags = 0;
 }
 
-// 判断该page block是否是满的
-static inline int _is_not_full(struct Page *page)
-{
-	if (page->flags & PAGE_FULL) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-// 判断该page block是否是可以用的
 static inline int _is_free(struct Page *page)
 {
 	if (page->flags & PAGE_TAKEN) {
@@ -79,21 +63,12 @@ static inline int _is_free(struct Page *page)
 		return 1;
 	}
 }
-static inline int _is_not_free(struct Page *page)
-{
-	if (page->flags & PAGE_TAKEN) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
 
-// 将flag的对应位设置为 1
 static inline void _set_flag(struct Page *page, uint8_t flags)
 {
 	page->flags |= flags;
 }
-// 判断该page 是否是连续开辟的最后一块page
+
 static inline int _is_last(struct Page *page)
 {
 	if (page->flags & PAGE_LAST) {
@@ -108,9 +83,8 @@ static inline int _is_last(struct Page *page)
  */
 static inline uint32_t _align_page(uint32_t address)
 {
-	uint32_t order = (1 << PAGE_ORDER) - 1; // 4K-1  0000 1111 1111 1111 
-	printf("order = 0x%x\n", order);
-	return (address + order) & (~order); // 把低12为置0，是为了方便内存整齐
+	uint32_t order = (1 << PAGE_ORDER) - 1;
+	return (address + order) & (~order);
 }
 
 void page_init()
@@ -119,11 +93,9 @@ void page_init()
 	 * We reserved 8 Page (8 x 4096) to hold the Page structures.
 	 * It should be enough to manage at most 128 MB (8 x 4096 x 4096) 
 	 */
-	// 计算page的个数，前8个page_size的大小用来存放page描述符
-	_num_pages = (HEAP_SIZE / PAGE_SIZE) - 8; 
+	_num_pages = (HEAP_SIZE / PAGE_SIZE) - 8;
 	printf("HEAP_START = %x, HEAP_SIZE = %x, num of pages = %d\n", HEAP_START, HEAP_SIZE, _num_pages);
-
-	// 清空page空间
+	
 	struct Page *page = (struct Page *)HEAP_START;
 	for (int i = 0; i < _num_pages; i++) {
 		_clear(page);
@@ -131,11 +103,7 @@ void page_init()
 	}
 
 	_alloc_start = _align_page(HEAP_START + 8 * PAGE_SIZE);
-	_mlloc_start = _alloc_start;
-	_mlloc_end = _alloc_start;
-	printf("HEAP_START + 8 * PAGE_SIZE = %x, _alloc_start = %x\n", HEAP_START + 8 * PAGE_SIZE, _alloc_start);
 	_alloc_end = _alloc_start + (PAGE_SIZE * _num_pages);
-
 
 	printf("TEXT:   0x%x -> 0x%x\n", TEXT_START, TEXT_END);
 	printf("RODATA: 0x%x -> 0x%x\n", RODATA_START, RODATA_END);
@@ -143,7 +111,6 @@ void page_init()
 	printf("BSS:    0x%x -> 0x%x\n", BSS_START, BSS_END);
 	printf("HEAP:   0x%x -> 0x%x\n", _alloc_start, _alloc_end);
 }
-
 
 /*
  * Allocate a memory block which is composed of contiguous physical pages
@@ -299,21 +266,12 @@ void my_free(void *ptr) {  // ptr 是要回收的空间
 	return;
 }
 
+
 void page_test()
 {
-	printf("PAGE_LAST: 0x%x\n", PAGE_LAST);
-	/*
 	void *p = page_alloc(2);
 	printf("p = 0x%x\n", p);
-	
-	void *m_p = my_malloc(32);
-	printf("m_p = 0x%x\n", m_p);
-	void *m_p1 = my_malloc(64);
-	printf("m_p1 = 0x%x\n", m_p1);
-	//my_free(m_p1);
-	void *m_p2 = my_malloc(2);
-	printf("m_p2 = 0x%x\n", m_p2);
-
+	//page_free(p);
 
 	void *p2 = page_alloc(7);
 	printf("p2 = 0x%x\n", p2);
@@ -321,19 +279,5 @@ void page_test()
 
 	void *p3 = page_alloc(4);
 	printf("p3 = 0x%x\n", p3);
-	printf("p3+16 = 0x%x\n", p3+16);
-	*/
-	void *p = my_malloc(128);
-	printf("p = 0x%x\n", p); // 0x8000d002
-	
-	void *p1 = my_malloc(2); 
-	printf("p1 = 0x%x\n", p1); // 0x8000d084
-	my_free(p1);
-
-	void *p2 = my_malloc(128);
-	printf("p2 = 0x%x\n", p2); // 0x8000d088
-	void *p3 = my_malloc(1);
-	printf("p3 = 0x%x\n", p3); // 0x8000d084
-		
 }
 
