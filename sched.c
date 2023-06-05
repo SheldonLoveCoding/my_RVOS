@@ -14,11 +14,6 @@ TaskNode tasks_priority[MAX_PRIORITY][2]; //优先级数组，用来保存每一
 uint8_t tasks_num[MAX_PRIORITY]; //每一个优先级中任务的数量
 uint8_t task_stack_priority[MAX_PRIORITY][MAX_TASKS][STACK_SIZE];//对应优先级的任务栈空间
 
-/* 利用mscratch寄存器切换上下文，这句汇编代表对mscratch寄存器写 */
-static void w_mscratch(reg_t x)
-{
-	asm volatile("csrw mscratch, %0" : : "r" (x));
-}
 
 void sched_init()
 {

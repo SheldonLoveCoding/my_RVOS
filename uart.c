@@ -52,12 +52,12 @@
 /*
  * LINE STATUS REGISTER (LSR)
  * LSR BIT 0:
- * 0 = no data in receive holding register or FIFO.
- * 1 = data has been receive and saved in the receive holding register or FIFO.
+ * 0 = no data in receive holding register or FIFO. 目前没有数据等待接收
+ * 1 = data has been receive and saved in the receive holding register or FIFO. 有数据等待接收
  * ......
  * LSR BIT 5:
- * 0 = transmit holding register is full. 16550 will not accept any data for transmission.
- * 1 = transmitter hold register (or FIFO) is empty. CPU can load the next character.
+ * 0 = transmit holding register is full. 16550 will not accept any data for transmission. 发送寄存器已满
+ * 1 = transmitter hold register (or FIFO) is empty. CPU can load the next character. 发送寄存器空闲
  * ......
  */
 #define LSR_RX_READY (1 << 0)
@@ -87,6 +87,7 @@ void uart_init()
 	 * split the value of 3(0x0003) into two bytes, DLL stores the low byte,
 	 * DLM stores the high byte.
 	 */
+	// 设置波特率
 	uint8_t lcr = uart_read_reg(LCR);
 	uart_write_reg(LCR, lcr | (1 << 7));
 	uart_write_reg(DLL, 0x03);
@@ -102,11 +103,20 @@ void uart_init()
 	 */
 	lcr = 0;
 	uart_write_reg(LCR, lcr | (3 << 0));
+
+	/*
+	 * enable receive interrupts.
+	 */
+	// 使能接受中断
+	uint8_t ier = uart_read_reg(IER);
+	uart_write_reg(IER, ier | (1 << 0));
 }
 
 int uart_putc(char ch)
 {
-	while ((uart_read_reg(LSR) & LSR_TX_IDLE) == 0);
+	// 判断发送寄存器是否空闲
+	while ((uart_read_reg(LSR) & LSR_TX_IDLE) == 0); 
+	// 空闲，则向发送寄存器 THR 写字符
 	return uart_write_reg(THR, ch);
 }
 
@@ -117,3 +127,30 @@ void uart_puts(char *s)
 	}
 }
 
+int uart_getc(void)
+{
+	// 如果接受寄存器有数据
+	if (uart_read_reg(LSR) & LSR_RX_READY){
+		//读取接受寄存器 RHR
+		return uart_read_reg(RHR);
+	} else {
+		return -1;
+	}
+}
+
+/*
+ * handle a uart interrupt, raised because input has arrived, called from trap.c.
+ */
+// UART0 中断获取输入
+void uart_isr(void)
+{
+	while (1) {
+		int c = uart_getc();
+		if (c == -1) {
+			break;
+		} else {
+			uart_putc((char)c);
+			uart_putc('\n');
+		}
+	}
+}

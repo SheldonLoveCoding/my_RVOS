@@ -18,6 +18,10 @@ void start_kernel(void)
 
 	malloc_init();
 
+	trap_init();
+
+	plic_init();
+
 	sched_init();
 
 	os_main();

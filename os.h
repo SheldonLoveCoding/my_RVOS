@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "platform.h"
+#include "riscv.h"
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -74,5 +75,9 @@ extern int task_create_priority(void (*start_routin)(void* param), void* param, 
 extern int add_taskNode(TaskNode* first, TaskNode* tail, TaskNode* task_new_node, int priority);
 extern int datch_taskNode(TaskNode* task_node);
 extern void task_exit(void);
+
+/* plic */
+extern int plic_claim(void);
+extern void plic_complete(int irq);
 
 #endif /* __OS_H__ */

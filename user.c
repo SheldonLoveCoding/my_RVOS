@@ -47,8 +47,9 @@ void user_task2(void* param)
 		if(i==3){
 			//task_exit();
 		}
-		printf("param2: %s\n", (char*)param);
+		//printf("param2: %s\n", (char*)param);
 		//printf("param2: Task 2\n");
+		uart_puts("param2: Task 2\n");
 		task_delay(DELAY);
 		task_yield();
 	}
@@ -64,8 +65,9 @@ void user_task3(void* param)
 		if(i==3){
 			//task_exit();
 		}
-		printf("param3: %s\n", (char*)param);
+		//printf("param3: %s\n", (char*)param);
 		//printf("param3: Task 3\n");
+		uart_puts("param3: Task 3\n");
 		task_delay(DELAY);
 		task_yield();
 	}
