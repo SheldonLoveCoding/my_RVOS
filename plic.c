@@ -45,7 +45,7 @@ void plic_init(void)
 
 	/* enable machine-mode global interrupts. */
 	// 使能machine模式下的全局中断
-	w_mstatus(r_mstatus() | MSTATUS_MIE);
+	//w_mstatus(r_mstatus() | MSTATUS_MIE);
 
 	/* enable machine-mode external interrupts. */
 	// 使能machine模式下的外部中断

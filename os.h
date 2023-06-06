@@ -7,7 +7,10 @@
 
 #include <stddef.h>
 #include <stdarg.h>
-//#include <stdlib.h>
+
+#define MAX_TASKS 10
+#define STACK_SIZE 1024
+#define MAX_PRIORITY 256
 
 /* uart */
 extern int uart_putc(char ch);
@@ -58,11 +61,17 @@ struct context {
 	reg_t t4;
 	reg_t t5;
 	reg_t t6;
+	// upon is trap frame
+
+	// save the pc to run in next schedule cycle
+	reg_t pc; // offset: 31 *4 = 124
 };
 
 // 双向任务节点
 typedef struct taskNode{
 	struct context* task;
+	uint32_t timeslice;
+	uint32_t task_id;
 	struct taskNode* pre;
 	struct taskNode* next;
 }TaskNode;
@@ -71,7 +80,7 @@ extern void task_delay(volatile int count);
 extern void task_yield();
 
 //优先级任务管理
-extern int task_create_priority(void (*start_routin)(void* param), void* param, int priority);
+extern int task_create_priority(void (*start_routin)(void* param), void* param, int priority, uint32_t timeslice);
 extern int add_taskNode(TaskNode* first, TaskNode* tail, TaskNode* task_new_node, int priority);
 extern int datch_taskNode(TaskNode* task_node);
 extern void task_exit(void);

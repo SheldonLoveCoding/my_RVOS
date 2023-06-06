@@ -2,6 +2,9 @@
 
 extern void trap_vector(void);
 extern void uart_isr(void);
+extern void timer_handler(void);
+extern void schedule_priority(void);
+
 
 void trap_init()
 {
@@ -36,6 +39,7 @@ void external_interrupt_handler()
 * 中断 Asynchronous trap 程序返回到原来指令的下一条指令地址
 * 异常 Synchronous trap  程序返回到原来指令的地址
 */
+
 reg_t trap_handler(reg_t epc, reg_t cause)
 {
 	reg_t return_pc = epc;
@@ -46,13 +50,23 @@ reg_t trap_handler(reg_t epc, reg_t cause)
 		switch (cause_code) {
 		case 3:
 			uart_puts("software interruption!\n");
+			/*
+			 * acknowledge the software interrupt by clearing
+    			 * the MSIP bit in mip.
+			 */
+			int id = r_mhartid();
+    		*(uint32_t*)CLINT_MSIP(id) = 0;
+
+			schedule_priority();
+
 			break;
 		case 7:
 			uart_puts("timer interruption!\n");
+			timer_handler();
 			break;
 		case 11:
 			uart_puts("external interruption!\n");
-			external_interrupt_handler(); //外部中断处理函数
+			external_interrupt_handler();
 			break;
 		default:
 			uart_puts("unknown async exception!\n");

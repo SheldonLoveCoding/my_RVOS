@@ -7,6 +7,8 @@
 extern void uart_init(void);
 extern void page_init(void);
 extern void malloc_init(void);
+extern void trap_init(void);
+extern void plic_init(void);
 extern void sched_init(void);
 extern void schedule_priority(void);
 extern void os_main(void);
@@ -21,6 +23,7 @@ void start_kernel(void)
 	trap_init();
 
 	plic_init();
+	timer_init();
 
 	sched_init();
 

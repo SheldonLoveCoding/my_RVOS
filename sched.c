@@ -3,9 +3,6 @@
 /* defined in entry.S */
 extern void switch_to(struct context *next);
 
-#define MAX_TASKS 10
-#define STACK_SIZE 1024
-#define MAX_PRIORITY 256
 
 uint8_t task_stack[MAX_TASKS][STACK_SIZE];
 struct context ctx_tasks[MAX_TASKS];
@@ -14,10 +11,14 @@ TaskNode tasks_priority[MAX_PRIORITY][2]; //优先级数组，用来保存每一
 uint8_t tasks_num[MAX_PRIORITY]; //每一个优先级中任务的数量
 uint8_t task_stack_priority[MAX_PRIORITY][MAX_TASKS][STACK_SIZE];//对应优先级的任务栈空间
 
+TaskNode* task_global_ptr;
+
 
 void sched_init()
 {
 	w_mscratch(0);
+	/* enable machine-mode software interrupts. */
+	w_mie(r_mie() | MIE_MSIE);
 
 	for(int i_pri = 0;i_pri < MAX_PRIORITY;i_pri++){
 		tasks_priority[i_pri][0].next = &tasks_priority[i_pri][1];
@@ -43,12 +44,17 @@ void schedule_priority()
 		}
 		priority++;
 	}
+	
 	//记录下要调用的下一个任务
 	struct context *next = tasks_priority[priority][0].next->task;
 	TaskNode * next_node = tasks_priority[priority][0].next;
+	
 	//将该任务移到链表末尾
 	datch_taskNode(next_node);
 	add_taskNode(&tasks_priority[priority][0], &tasks_priority[priority][1], next_node, priority);
+
+	//记录下一个将要调用的任务信息，全局变量暴露给timer.c
+	task_global_ptr = tasks_priority[priority][0].next;
 	//跳转
 	switch_to(next);
 	
@@ -83,21 +89,26 @@ int datch_taskNode(TaskNode* task_node){
  * 	0: 成功
  * 	-1: 出错
  */
-int task_create_priority(void (*start_routin)(void* param), void* param, int priority)
+int task_create_priority(void (*start_routin)(void* param), void* param, int priority, uint32_t timeslice)
 {
 	//判断任务数量是否超过最大数目
 	if (tasks_num[priority] < MAX_TASKS) {
 		//创建上下文
 		struct context* ctx_task = (struct context*)my_malloc(sizeof(struct context));
 		ctx_task->sp = (reg_t) &task_stack_priority[priority][tasks_num[priority]][STACK_SIZE - 1];
-		ctx_task->ra = (reg_t) start_routin;
+		ctx_task->pc = (reg_t) start_routin;
 		ctx_task->a0 = (reg_t) param;
 		//创建任务节点
 		TaskNode* task_new_node = (TaskNode*)my_malloc(sizeof(TaskNode));
 		task_new_node->task = ctx_task;
+		task_new_node->task_id = tasks_num[priority];
+		//设置运行时间片
+		task_new_node->timeslice = timeslice;
 
 		//加入到对应优先级的任务链表
 		add_taskNode(&tasks_priority[priority][0], &tasks_priority[priority][1], task_new_node, priority);
+
+		//递增任务数量
 		tasks_num[priority]++;
 		return 0;
 	} else {
@@ -129,8 +140,6 @@ void task_exit()
 	return;
 }
 
-
-
 /*
  * DESCRIPTION
  * 	task_yield()  causes the calling task to relinquish the CPU and a new 
@@ -139,8 +148,9 @@ void task_exit()
  */
 void task_yield()
 {
-	
-	schedule_priority();
+	/* trigger a machine-level software interrupt */
+	int id = r_mhartid();
+	*(uint32_t*)CLINT_MSIP(id) = 1;
 }
 
 /*
