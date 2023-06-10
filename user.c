@@ -1,6 +1,10 @@
 #include "os.h"
 
-#define DELAY 1000
+#define DELAY 4000
+
+//#define USE_LOCK
+extern struct spinlock lk;
+int num = 1;
 
 void user_task0(void* param)
 {
@@ -87,14 +91,55 @@ void user_task3(void* param)
 	}
 }
 
+void user_task7(void* param)
+{
+	uart_puts("Task 7: Created!\n");
+	while (1) {
+#ifdef USE_LOCK
+		//printf("ld addr: 0x%x, locked: %d\n", &lk, lk.locked);
+		spin_lock(&lk);
+#endif	
+		//uart_puts("Task 0: Begin ... \n");
+		for (int i = 0; i < 5; i++) {
+			//printf("Task 0: num: %d\n", num);
+			task_delay(DELAY);
+			num = num+1;
+			printf("Task 7: num: %d\n", num);
+		}
+		//uart_puts("Task 0: End ... \n");
+#ifdef USE_LOCK
+		spin_unlock(&lk);
+#endif
+	}
+}
+
+void user_task8(void* param)
+{
+	uart_puts("Task 8: Created!\n");
+	while (1) {
+#ifdef USE_LOCK
+		//printf("ld addr: 0x%x, locked: %d\n", &lk, lk.locked);
+		spin_lock(&lk);
+		
+#endif
+		//uart_puts("Task 1: Begin ... \n");
+		for (int i = 0; i < 5; i++) {
+			num = num+1;
+			task_delay(DELAY);
+			printf("Task 8: num: %d\n", num);
+		}
+		//uart_puts("Task 1: End ... \n");
+#ifdef USE_LOCK
+		spin_unlock(&lk);
+#endif
+	}
+}
+
 /* NOTICE: DON'T LOOP INFINITELY IN main() */
 void os_main(void)
 {
-	/*task_create(user_task0);
-	task_create(user_task1);
-	task_create(user_task2);
-	task_create(user_task3);
-	*/
+	/*
+	// 1. 测试抢占式优先级多任务调度
 	char* param0 = "Task 0: priority 0\n";
 	task_create_priority(user_task0, param0, 0, 10000000);
 	printf("user_task0 == 0x%x\n ", user_task0);
@@ -103,11 +148,19 @@ void os_main(void)
 	char* param5 = "Task 5: priority 0\n";
 	task_create_priority(user_task5, param5, 0, 40000000);
 	
-	char* param2 = "Task 2: priority 0\n";
+	char* param2 = "Task 2: priority 1\n";
 	task_create_priority(user_task2, param2, 1, 10000000);
 
-	char* param3 = "Task 3: priority 0\n";
+	char* param3 = "Task 3: priority 1\n";
 	task_create_priority(user_task3, param3, 1, 10000000);	
-	
+	*/
+
+
+	// 2. 测试自旋锁
+	char* param7 = "Task 7: priority 0\n";
+	task_create_priority(user_task7, param7, 0, 10000000);
+	char* param8 = "Task 8: priority 0\n";
+	task_create_priority(user_task8, param8, 0, 10000000);
+
 }
 

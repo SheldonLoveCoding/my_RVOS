@@ -9,9 +9,13 @@ extern void page_init(void);
 extern void malloc_init(void);
 extern void trap_init(void);
 extern void plic_init(void);
+extern void timer_init(void);
 extern void sched_init(void);
 extern void schedule_priority(void);
 extern void os_main(void);
+
+extern int lock_init(struct spinlock* lk);
+struct spinlock lk;
 
 void start_kernel(void)
 {

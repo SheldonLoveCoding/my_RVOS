@@ -1,10 +1,8 @@
 #include "os.h"
-
-extern void schedule_priority(void);
-
 /* interval ~= 1s */
 #define TIMER_INTERVAL CLINT_TIMEBASE_FREQ
 
+extern void schedule_priority(void);
 static uint32_t _tick = 0;
 
 extern TaskNode* task_global_ptr;

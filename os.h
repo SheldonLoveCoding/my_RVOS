@@ -23,7 +23,7 @@ extern void panic(char *s);
 /* memory management */
 extern void *page_alloc(int npages);
 extern void page_free(void *p);
-
+//字节级内存管理
 extern void *my_malloc(size_t size); 
 extern void my_free(void *ptr);
 
@@ -88,5 +88,14 @@ extern void task_exit(void);
 /* plic */
 extern int plic_claim(void);
 extern void plic_complete(int irq);
+
+/* lock */
+//自旋锁
+struct spinlock{
+	int locked;
+};
+
+extern int spin_lock(struct spinlock* lk);
+extern int spin_unlock(struct spinlock* lk);
 
 #endif /* __OS_H__ */
