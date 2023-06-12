@@ -2,10 +2,36 @@
 
 #define DELAY 4000
 
-//#define USE_LOCK
+// 测试自旋锁
+#define USE_LOCK
 extern struct spinlock lk;
 int num = 1;
 
+// 测试软件定时器
+struct userdata {
+	int counter;
+	char *str;
+};
+
+struct userdata person = {0, "Jack"};
+
+void timer_func(void *arg)
+{
+	if (NULL == arg)
+		return;
+
+	struct userdata *param = (struct userdata *)arg;
+
+	param->counter++;
+	printf("======> TIMEOUT: %s: %d\n", param->str, param->counter);
+}
+
+
+/*
+* task0\task1\task5\task2\task3 用来测试多任务调度
+* task7\task8 用来测试自旋锁
+* task9\task10 用来测试软件定时器
+*/
 void user_task0(void* param)
 {
 	uart_puts("Task 0: Created!\n");
@@ -135,6 +161,48 @@ void user_task8(void* param)
 	}
 }
 
+void user_task9(void* param)
+{
+	uart_puts("Task 9: Created!\n");
+
+	struct timer *t1 = timer_create(timer_func, &person, 10);
+	if (NULL == t1) {
+		printf("timer_create() failed!\n");
+	}
+	struct timer *t2 = timer_create(timer_func, &person, 5);
+	if (NULL == t2) {
+		printf("timer_create() failed!\n");
+	}
+	struct timer *t3 = timer_create(timer_func, &person, 5);
+	if (NULL == t3) {
+		printf("timer_create() failed!\n");
+	}
+	int i = 1;
+	while (1) {
+		i++;
+		uart_puts("Task 9: Running... \n");
+		task_delay(DELAY);
+		/*
+		if(i == 10){
+			timer_delete(t1);
+		}
+		if(i == 15){
+			timer_delete(t3);
+		}		
+		*/
+
+	}
+}
+
+void user_task10(void* param)
+{
+	uart_puts("Task 10: Created!\n");
+	while (1) {
+		uart_puts("Task 10: Running... \n");
+		task_delay(DELAY);
+	}
+}
+
 /* NOTICE: DON'T LOOP INFINITELY IN main() */
 void os_main(void)
 {
@@ -155,12 +223,20 @@ void os_main(void)
 	task_create_priority(user_task3, param3, 1, 10000000);	
 	*/
 
-
+	/*
 	// 2. 测试自旋锁
 	char* param7 = "Task 7: priority 0\n";
 	task_create_priority(user_task7, param7, 0, 10000000);
 	char* param8 = "Task 8: priority 0\n";
 	task_create_priority(user_task8, param8, 0, 10000000);
+	*/
+
+	// 3. 测试软件定时器
+	char* param9 = "Task 9: priority 0\n";
+	task_create_priority(user_task9, param9, 0, 10000000);
+	char* param10 = "Task 10: priority 0\n";
+	task_create_priority(user_task10, param10, 0, 10000000);
+	
 
 }
 

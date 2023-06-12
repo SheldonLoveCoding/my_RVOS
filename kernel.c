@@ -27,12 +27,13 @@ void start_kernel(void)
 	trap_init();
 
 	plic_init();
+	uart_puts("timplic_initer is done!\n");
 	timer_init();
-
+	uart_puts("timer is done!\n");
 	sched_init();
 
 	os_main();
-	uart_puts("create is done!\n");
+	uart_puts("task create is done!\n");
 	
 	schedule_priority();
 	

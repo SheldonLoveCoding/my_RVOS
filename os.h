@@ -98,4 +98,19 @@ struct spinlock{
 extern int spin_lock(struct spinlock* lk);
 extern int spin_unlock(struct spinlock* lk);
 
+/* software timer */
+struct timer {
+	void (*func)(void *arg);
+	void *arg;
+	uint32_t timeout_tick;
+};
+struct TimerNode {
+	struct timer* timer;
+	struct TimerNode* next;
+};
+
+extern struct timer *timer_create(void (*handler)(void *arg), void *arg, uint32_t timeout);
+extern void timer_delete(struct timer *timer);
+extern int add_TimeNode(struct TimerNode* dummyHead, struct TimerNode* node);
+
 #endif /* __OS_H__ */
