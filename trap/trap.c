@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 extern void trap_vector(void);
 extern void uart_isr(void);

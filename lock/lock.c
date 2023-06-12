@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 void lock_init(struct spinlock* lk){
 	lk->locked = 0;

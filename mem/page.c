@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 /*
  * Following global vars are defined in mem.S

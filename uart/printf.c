@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 /*
  * ref: https://github.com/cccriscv/mini-riscv-os/blob/master/05-Preemptive/lib.c

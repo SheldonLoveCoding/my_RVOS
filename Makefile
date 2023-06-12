@@ -2,20 +2,20 @@ include ./common.mk
 
 SRCS_ASM = \
 	start.S \
-	mem.S \
+	./mem/mem.S \
 	entry.S \
 
 SRCS_C = \
 	kernel.c \
-	uart.c \
-	printf.c \
-	page.c \
-	sched.c \
-	user.c \
-	trap.c \
-	plic.c \
-	timer.c \
-	lock.c \
+	./uart/uart.c \
+	./uart/printf.c \
+	./mem/page.c \
+	./sched/sched.c \
+	./user/user.c \
+	./trap/trap.c \
+	./trap/plic.c \
+	./trap/timer.c \
+	./lock/lock.c \
 
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)
@@ -53,5 +53,7 @@ code: all
 
 .PHONY : clean
 clean:
-	rm -rf *.o *.bin *.elf
+	find . -type f -name "*.o" -delete
+	find . -type f -name "*.bin" -delete
+	find . -type f -name "*.elf" -delete
 

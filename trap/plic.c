@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 void plic_init(void)
 {

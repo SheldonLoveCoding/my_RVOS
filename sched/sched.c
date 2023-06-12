@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 
 /* defined in entry.S */
 extern void switch_to(struct context *next);

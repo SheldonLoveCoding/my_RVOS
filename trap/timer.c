@@ -1,4 +1,4 @@
-#include "os.h"
+#include "../os.h"
 /* interval ~= 1s */
 #define TIMER_INTERVAL CLINT_TIMEBASE_FREQ
 #define MAX_TIMER 10
