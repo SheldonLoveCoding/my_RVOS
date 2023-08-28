@@ -30,8 +30,9 @@ void *last_valid_address;    // 指向堆顶
 
 /* 内存控制块，用来描述malloc的开辟的nbytes内存块的信息*/
 struct mem_control_block {
+  
+  uint32_t size;         // 实际空间的大小
   uint8_t is_used; // 是否可用（如果还没被分配出去，就是 0）
-  uint8_t size;         // 实际空间的大小
 };
 
 #define PAGE_SIZE 4096
@@ -193,12 +194,15 @@ void malloc_init() {
 	// 这里不向操作系统申请堆空间，只是为了获取堆的起始地址和最后有效地址
 	last_valid_address = (void *)_alloc_end; // 堆的最后有效地址last_valid_address
 	managed_memory_start = (void *)_alloc_start; //堆的起始地址managed_memory_start
+	
 	_mlloc_initialized = 1;
 }
 
 void *my_malloc(size_t numbytes) {
-	void *current_location;  // 当前访问的内存位置
+	char *current_location;  // 当前访问的内存位置
+	char *current_location_tail;  // 当前访问的内存块的末尾位置
 	struct mem_control_block *current_location_mcb;  // 只是作了一个强制类型转换
+	struct mem_control_block *current_location_mcb_tail;
 	
 	void *memory_location;  // 这是要返回的内存位置。初始时设为
 							// 0，表示没有找到合适的位置
@@ -206,7 +210,7 @@ void *my_malloc(size_t numbytes) {
 		malloc_init();
 	}
 	// 要查找的内存必须包含内存控制块，所以需要调整 numbytes 的大小
-	numbytes = numbytes + sizeof(struct mem_control_block);
+	numbytes = numbytes + 2 * sizeof(struct mem_control_block);
 	// 初始时设为 0，表示没有找到合适的位置
 	memory_location = 0;
 	/* Begin searching at the start of managed memory */
@@ -220,19 +224,38 @@ void *my_malloc(size_t numbytes) {
 		current_location_mcb = (struct mem_control_block *)current_location;
 		
 		if (!current_location_mcb->is_used) {
-			if((current_location_mcb->size == 0) || 
-					(current_location_mcb->size != 0 && current_location_mcb->size >= numbytes))
-					{
-						// 找到一个可用、大小适合的内存块
-						current_location_mcb->is_used = 1;  // 设为不可用
-						current_location_mcb->size = numbytes;
-						memory_location = current_location;      // 设置内存地址
-						break;
-					}
+			if((current_location_mcb->size == 0) || (current_location_mcb->size != 0 && current_location_mcb->size >= numbytes))
+			{
+				// 找到一个新的内存块
+				/*
+				if((current_location_mcb->size != 0 && current_location_mcb->size >= numbytes)){
+					char *_tail = current_location + current_location_mcb->size - sizeof(struct mem_control_block);
+					struct mem_control_block * _mcb_tail = (struct mem_control_block *)_tail;
+					_mcb_tail->is_used = 0;
+					_mcb_tail->size = 0;
+				}
+				*/
+								
+				
+
+				current_location_mcb->is_used = 1;  // 设为不可用
+				current_location_mcb->size = numbytes;
+
+				memory_location = current_location;      // 设置内存地址
+
+				current_location_tail = current_location + numbytes - sizeof(struct mem_control_block);
+				current_location_mcb_tail = (struct mem_control_block *)current_location_tail;
+				current_location_mcb_tail->is_used = 1;  // 设为不可用
+				current_location_mcb_tail->size = numbytes;
+				
+
+				break;
+			}
 		}
 		// 否则，当前内存块不可用或过小，移动到下一个内存块
 		current_location = current_location + current_location_mcb->size;
 	}
+	
 	// 循环结束，没有找到合适的位置，需要向操作系统申请更多内存，但是在本系统里不会涉及拓展的问题
 	if (!memory_location) {
 		printf("RVOS need create a new page!!\n");
@@ -259,25 +282,192 @@ void *my_malloc(size_t numbytes) {
 	return memory_location;
 }
 
+uint8_t pre_is_used(void *ptr){
+	struct mem_control_block *pre_mem_tail = ptr - 2*sizeof(struct mem_control_block);
+	return pre_mem_tail->is_used;
+}
+
+uint8_t pre_mem_size(void *ptr){
+	struct mem_control_block *pre_mem_tail = ptr - 2*sizeof(struct mem_control_block);
+	return pre_mem_tail->size;
+}
+
+uint8_t next_is_used(void *ptr){
+	struct mem_control_block *mem_head = ptr - sizeof(struct mem_control_block);
+	struct mem_control_block *next_mem_head = ptr - sizeof(struct mem_control_block) + mem_head->size;
+	return next_mem_head->is_used;
+}
+
+uint8_t next_mem_size(void *ptr){
+	struct mem_control_block *mem_head = ptr - sizeof(struct mem_control_block);
+	struct mem_control_block *next_mem_head = ptr - sizeof(struct mem_control_block) + mem_head->size;
+	return next_mem_head->size;
+}
+
 void my_free(void *ptr) {  // ptr 是要回收的空间
 	struct mem_control_block *free;
 	free = ptr - sizeof(struct mem_control_block); // 找到该内存块的控制信息的地址
-	free->is_used = 0;  // 该空间置为可用
+	
+	
+	printf("ptr: 0x%x, pre is used: %d\n", ptr, pre_is_used(ptr));
+	printf("ptr: 0x%x, pre mem size: %d\n", ptr, pre_mem_size(ptr));
+	printf("ptr: 0x%x, next is used: %d\n", ptr, next_is_used(ptr));
+	printf("ptr: 0x%x, next mem size: %d\n", ptr, next_mem_size(ptr));	
+	
+
+
+	uint8_t preIsUsed = pre_is_used(ptr);
+	uint8_t nextIsUsed = next_is_used(ptr);
+	uint32_t preMemSize = pre_mem_size(ptr);
+	uint32_t nextMemSize = next_mem_size(ptr);
+	if(preIsUsed && !nextIsUsed){
+		// 后面的内存块空闲
+		if(nextMemSize == 0){
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+			free->is_used = 0;  // 该空间置为可用
+			free_tail->is_used = 0;  // 该空间置为可用
+		}else{
+			uint32_t newSize = free->size + nextMemSize;
+			struct mem_control_block *next_mem_tail = ptr - 2*sizeof(struct mem_control_block) + free->size + nextMemSize;
+			struct mem_control_block *next_mem_head = ptr - sizeof(struct mem_control_block) + free->size;
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+
+			next_mem_head->is_used = 0;
+			next_mem_head->size = 0;
+			free_tail->is_used = 0;
+			free_tail->size = 0;
+
+			next_mem_tail->is_used = 0;
+			next_mem_tail->size = newSize;
+			free->is_used = 0;  // 该空间置为可用
+			free->size = newSize;			
+		}
+		
+
+	}else if(!preIsUsed && nextIsUsed){
+		// 前面的内存块空闲
+		if(preMemSize == 0){
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+			free->is_used = 0;
+			free_tail->is_used = 0;  // 该空间置为可用
+		}else{
+			uint32_t newSize = free->size + preMemSize;
+			struct mem_control_block *pre_mem_head = ptr - sizeof(struct mem_control_block) - preMemSize;
+			struct mem_control_block *pre_mem_tail = ptr - 2*sizeof(struct mem_control_block);
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+
+			free->is_used = 0;
+			free->size = 0;	
+			pre_mem_tail->is_used = 0;
+			pre_mem_tail->size = 0;
+
+			pre_mem_head->is_used = 0;
+			pre_mem_head->size = newSize;
+			free_tail->is_used = 0;  // 该空间置为可用
+			free_tail->size = newSize;
+		}
+		
+	}else if(!preIsUsed && !nextIsUsed){
+		// 前后的内存块空闲
+		if(nextMemSize == 0 && preMemSize == 0){
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+			free->is_used = 0;  // 该空间置为可用
+			free_tail->is_used = 0;  // 该空间置为可用
+		}else{
+			uint32_t newSize = free->size + preMemSize + nextMemSize;
+			
+			struct mem_control_block *pre_mem_head = ptr - sizeof(struct mem_control_block) - preMemSize;
+			struct mem_control_block *pre_mem_tail = ptr - 2*sizeof(struct mem_control_block);
+			struct mem_control_block *free_tail = ptr - 2*sizeof(struct mem_control_block) + free->size;
+			struct mem_control_block *next_mem_head = ptr - sizeof(struct mem_control_block) + free->size;
+			struct mem_control_block *next_mem_tail = ptr - sizeof(struct mem_control_block) + free->size + nextMemSize;
+
+			pre_mem_tail->is_used = 0;
+			pre_mem_tail->size = 0;
+			free_tail->is_used = 0;
+			free_tail->size = 0;
+			next_mem_head->is_used = 0;
+			next_mem_head->size = 0;
+			
+			pre_mem_head->is_used = 0;
+			pre_mem_head->size = newSize;
+			next_mem_tail->is_used = 0;
+			next_mem_tail->size = newSize;
+		}
+		
+	}
+
 	return;
 }
 
+void showInfo(void *m_p, int blockSize){
+	printf("m_p = 0x%x\n m_p is used: %d, m_p size is %d\n", m_p, ((struct mem_control_block *)(m_p-blockSize))->is_used, \
+		((struct mem_control_block *)(m_p-blockSize))->size);
+}
 
 void page_test()
 {
-	void *p = page_alloc(2);
-	printf("p = 0x%x\n", p);
-	//page_free(p);
+	printf("PAGE_LAST: 0x%x\n", PAGE_LAST);
+	printf("managed_memory_start: 0x%x\n", managed_memory_start);
+	printf("sizeof(struct mem_control_block): 0x%x\n", sizeof(struct mem_control_block));
+	int blockSize = sizeof(struct mem_control_block);
+	
+	{
+		printf("=======Test backward merge=======\n");
+		void *m_p = my_malloc(32);
+		showInfo(m_p, blockSize);
+		void *m_p1 = my_malloc(32);
+		showInfo(m_p1, blockSize);
+		
+		void *m_p2 = my_malloc(32);
+		showInfo(m_p2, blockSize);
+		
+		printf("m_p = 0x%x, next_mem_size is %d\n", m_p2, next_mem_size(m_p2));
+		my_free(m_p2);
+		printf("m_p = 0x%x, next_mem_size is %d\n", m_p2, next_mem_size(m_p2));
+		my_free(m_p1);
+		//void *m_p3 = my_malloc(32);
+		//showInfo(m_p3, blockSize);
+		//my_free(m_p3);
+		my_free(m_p);
+	}
 
-	void *p2 = page_alloc(7);
-	printf("p2 = 0x%x\n", p2);
-	page_free(p2);
+	void *m_p3 = 0x8000d008;
+	showInfo(m_p3, blockSize);
 
-	void *p3 = page_alloc(4);
-	printf("p3 = 0x%x\n", p3);
+
+	{
+		// 测试向前合并
+		printf("=======Test forward merge=======\n");
+		void *m_p = my_malloc(32);
+		showInfo(m_p, blockSize);
+		void *m_p1 = my_malloc(32);
+		showInfo(m_p1, blockSize);
+		
+		void *m_p2 = my_malloc(32);
+		showInfo(m_p2, blockSize);
+		my_free(m_p);
+		my_free(m_p1);
+		my_free(m_p2);
+		//void *m_p3 = my_malloc(32);
+		//showInfo(m_p3, blockSize);
+	}
+
+	{
+		// 测试前后合并
+		printf("=======Test back/forward merge=======\n");
+		void *m_p = my_malloc(32);
+		showInfo(m_p, blockSize);
+		void *m_p1 = my_malloc(32);
+		showInfo(m_p1, blockSize);
+		
+		void *m_p2 = my_malloc(2);
+		showInfo(m_p2, blockSize);
+		my_free(m_p);
+		my_free(m_p2);
+		my_free(m_p1);
+		//void *m_p3 = my_malloc(32);
+		//showInfo(m_p3, blockSize);
+	}	
 }
 

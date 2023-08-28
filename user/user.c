@@ -231,11 +231,13 @@ void os_main(void)
 	task_create_priority(user_task8, param8, 0, 10000000);
 	*/
 
+	///*
 	// 3. 测试软件定时器
 	char* param9 = "Task 9: priority 0\n";
 	task_create_priority(user_task9, param9, 0, 10000000);
 	char* param10 = "Task 10: priority 0\n";
-	task_create_priority(user_task10, param10, 0, 10000000);
+	task_create_priority(user_task10, param10, 0, 20000000);
+	//*/
 	
 
 }
